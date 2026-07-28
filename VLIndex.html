@@ -823,15 +823,17 @@ body.theme-dusk .cell.weekend,body.theme-amethyst .cell.weekend{background:var(-
   </div>
 </div>
 
-<div class="popover popover-ov" id="overflowPopover" onmouseenter="clearTimeout(poOvTimer)" onmouseleave="closeOverflowPopover()">
-  <div id="overflowCaret" class="popover-caret"></div>
-  <div class="sd-head">
-    <div class="sd-title-wrap">
-      <div class="sd-title" id="overflowTitle">Date Details</div>
+<div class="ov" id="overflowPopover" onclick="closeOverflowPopover()">
+  <div class="cm" style="max-width:380px; max-height:80vh; display:flex; flex-direction:column;" onclick="event.stopPropagation()">
+    <div class="cm-head" style="padding:16px 20px; border-bottom:1px solid var(--border-grid); display:flex; align-items:center; justify-content:space-between; background:var(--bg-sidebar);">
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <div class="cm-ttl" id="overflowTitle" style="font-size:16px; margin:0;">Date Details</div>
+        <div id="sdHolidayRow" class="sd-holiday" style="display:none; border:1px solid var(--orange-main); font-size:11px; padding:4px 10px; border-radius:20px; color:var(--orange-txt); background:var(--orange-bg); align-items:center; gap:6px; width:fit-content;"><span class="material-symbols-rounded" style="font-size:16px">celebration</span> <span id="sdHolidayTxt"></span></div>
+      </div>
+      <button onclick="closeOverflowPopover()" style="background:var(--bg-cell);border:1px solid var(--border-grid);color:var(--text-muted);cursor:pointer;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all 0.2s;"><span class="material-symbols-rounded" style="font-size:20px">close</span></button>
     </div>
-    <div id="sdHolidayRow" class="sd-holiday" style="display:none;border:1px solid var(--orange-main)"><span class="material-symbols-rounded" style="font-size:16px">celebration</span> <span id="sdHolidayTxt"></span></div>
+    <div class="sd-list" id="overflowList" style="flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:6px; background:var(--bg-surface);"></div>
   </div>
-  <div class="sd-list" id="overflowList"></div>
 </div>
 
 <div class="popover" id="eventPopover" onmouseenter="clearTimeout(poTimer)" onmouseleave="closePopover()">
@@ -2804,7 +2806,7 @@ function renderCalendar(){
 
     if(dayEvents.length>4){
       dayEvents.slice(0,4).forEach(function(e){html+=renderEventChip(e)});
-      html+='<div class="event-more" onclick="showDayOverflow(event,\''+dateStr+'\')" onmouseenter="showDayOverflow(event,\''+dateStr+'\')" onmouseleave="closeOverflowPopover()">+' +(dayEvents.length-4)+' others</div>';
+      html+='<div class="event-more" onclick="showDayOverflow(event,\''+dateStr+'\')">+' +(dayEvents.length-4)+' others</div>';
     }else{
       dayEvents.forEach(function(e){html+=renderEventChip(e)});
     }
@@ -2833,8 +2835,8 @@ function renderCalendar(){
 /* QoL #5: Overflow popover with intelligent positioning */
 function showDayOverflow(ev,dateStr){
   clearTimeout(poOvTimer);
+  if(document.querySelector('.form-overlay.on') || document.querySelector('.admin-console.on') || document.querySelector('.ov.on')) return;
   var target = ev.currentTarget;
-  poOvTimer = setTimeout(function(){
     var activeWGs=Array.from(document.querySelectorAll('.wg-filter:checked')).map(function(el){return el.value});
     var activeSites=Array.from(document.querySelectorAll('.st-filter:checked')).map(function(el){return el.value});
     var activeChans=Array.from(document.querySelectorAll('.ch-filter:checked')).map(function(el){return el.value});
@@ -2885,41 +2887,17 @@ function showDayOverflow(ev,dateStr){
 
     var po=document.getElementById('overflowPopover');
     document.getElementById('overflowList').innerHTML=listHtml;
-    po.style.display='flex';
-
-    /* Position & Caret Logic */
-    var rect = target.getBoundingClientRect();
-    var poW = 320;
-    var poH = po.offsetHeight || 300;
-    var left = rect.left + (rect.width/2) - (poW/2);
-    var top = rect.top + rect.height + 10;
-    var posClass = 'pos-bottom';
-
-    if(top + poH > window.innerHeight){
-      top = rect.top - poH - 10;
-      posClass = 'pos-top';
-    }
-    if(left < 10) left = 10;
-    if(left + poW > window.innerWidth - 10) left = window.innerWidth - poW - 10;
-
-    var caret = document.getElementById('overflowCaret');
-    var caretLeft = (rect.left + rect.width/2) - left - 6;
-    caret.style.left = caretLeft + 'px';
-
-    po.style.left=left+'px';po.style.top=top+'px';
-    po.className = 'popover popover-ov on ' + posClass;
-  }, 150);
+    po.classList.add('on');
 }
 function closeOverflowPopover(){
   clearTimeout(poOvTimer);
-  poOvTimer = setTimeout(function(){
-    document.getElementById('overflowPopover').classList.remove('on');
-  }, 100);
+  document.getElementById('overflowPopover').classList.remove('on');
 }
 
 /* QoL #14: Popover with intelligent caret side and delay */
 function showEventDetails(ev,targetId){
   clearTimeout(poTimer);
+  if(document.querySelector('.form-overlay.on') || document.querySelector('.admin-console.on') || document.querySelector('.ov.on')) return;
   var target = ev.currentTarget;
   poTimer = setTimeout(function(){
     var e=serverEvents.find(function(evnt){return evnt.id.toString()===targetId.toString()});
@@ -3916,24 +3894,7 @@ function showMWLDayOverflow(ev, dateStr) {
 
   var po = document.getElementById('overflowPopover');
   document.getElementById('overflowList').innerHTML = listHtml;
-  po.style.display = 'flex';
-
-  var rect = ev.currentTarget.getBoundingClientRect();
-  var poW  = 320;
-  var poH  = po.offsetHeight || 300;
-  var left = rect.left + (rect.width / 2) - (poW / 2);
-  var top  = rect.top + rect.height + 10;
-  var posClass = 'pos-bottom';
-
-  if (top + poH > window.innerHeight) { top = rect.top - poH - 10; posClass = 'pos-top'; }
-  if (left < 10) left = 10;
-  if (left + poW > window.innerWidth - 10) left = window.innerWidth - poW - 10;
-
-  var caret = document.getElementById('overflowCaret');
-  caret.style.left = ((rect.left + rect.width / 2) - left - 6) + 'px';
-  po.style.left = left + 'px';
-  po.style.top  = top  + 'px';
-  po.className  = 'popover popover-ov on ' + posClass;
+  po.classList.add('on');
 }
 
 /* ══════════════════════════════════════════════
