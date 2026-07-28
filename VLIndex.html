@@ -558,6 +558,26 @@
     /* ── LIVE SYNC ── */
     @keyframes cellFlash{0%{background:rgba(26,115,232,.18)}100%{background:var(--bg-cell)}}
     .cell.new-event-flash{animation:cellFlash 1.8s ease-out}
+    /* ── PHANTOM CLICKS FIX ── */
+    body:has(.ov.on),
+    body:has(.form-overlay.on),
+    body:has(.admin-console.on),
+    body:has(#trexModal[style*="display: flex"]),
+    body:has(#trexGameOverModal[style*="display: flex"]) {
+      pointer-events: none;
+    }
+
+    body:has(.ov.on) .ov,
+    body:has(.form-overlay.on) .form-overlay,
+    body:has(.admin-console.on) .admin-console,
+    body:has(#trexModal[style*="display: flex"]) #trexModal,
+    body:has(#trexGameOverModal[style*="display: flex"]) #trexGameOverModal,
+    body:has(.ov.on) #toastContainer,
+    body:has(.form-overlay.on) #toastContainer,
+    body:has(.admin-console.on) #toastContainer {
+      pointer-events: auto;
+    }
+
     /* ── THEME SYSTEM ── */
 body.theme-ocean {
   --bg-page:#001e2f;--bg-surface:#191c1e;--bg-sidebar:#001e2f;--bg-header:#001e2f;--bg-cell:#191c1e;--bg-cell-hover:#232a2f;--bg-cell-inactive:#0a141a;--border-light:#41484d;--border-grid:#41484d;--text-main:#e1e2e5;--text-muted:#c1c7ce;--text-title:#e1e2e5;--blue-main:#76d1ff;--blue-bg:#004c68;--blue-txt:#c2e8ff;--green-main:#6edba2;--green-bg:#005234;--green-txt:#e7f5e9;--red-main:#ffb4ab;--red-bg:#93000a;--red-txt:#ffdad6;--yellow-main:#dfc38c;--yellow-bg:#442b00;--yellow-txt:#ffddb3;--orange-main:#dfc38c;--purple-main:#d0bcff;--purple-bg:#4a0080;--purple-txt:#eaddff;
@@ -1160,7 +1180,10 @@ body.theme-dusk .cell.weekend,body.theme-amethyst .cell.weekend{background:var(-
         </div>
         <div class="decl-box"><p class="decl-text">I hereby declare that the information given in this application is true and correct.</p><div class="decl-row"><input type="checkbox" id="declChk" onchange="toggleSub()"><label for="declChk">I agree</label></div></div>
         <div id="errMsg"></div>
-        <button class="sub-btn" id="subBtn" disabled onclick="openConfirm()"><span id="subTxt">Review &amp; Submit</span><div class="spn" id="subSpn"></div></button>
+        <div style="display:flex; gap:12px; margin-top:32px;">
+          <button class="sub-btn" id="clearBtn" onclick="clearVLForm()" style="background:var(--bg-surface); color:var(--text-main); border:1px solid var(--border-grid); margin-top:0;"><span class="material-symbols-rounded" style="font-size:18px; margin-right:4px;">delete_sweep</span> Clear Form</button>
+          <button class="sub-btn" id="subBtn" disabled onclick="openConfirm()" style="flex:2; margin-top:0;"><span id="subTxt">Review &amp; Submit</span><div class="spn" id="subSpn"></div></button>
+        </div>
       </div>
     </div>
   </div>
@@ -3205,6 +3228,51 @@ function validateLdapOnSubmit(){
     return false;
   }
   return false;
+}
+
+function clearVLForm(){
+  if(!confirm("Are you sure you want to clear all form fields?")) return;
+
+  clearFieldErrors();
+  document.getElementById('errMsg').style.display='none';
+
+  // Clear text/date inputs
+  ['vlDate', 'acrUrl', 'acrNum', 'bdayDate', 'proofUrl'].forEach(function(id){
+    document.getElementById(id).value='';
+  });
+
+  // Clear hidden inputs
+  ['chVal', 'tmVal', 'rsVal', 'wgVal', 'stVal', 'moVal'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.value = '';
+  });
+
+  // Reset chips
+  document.querySelectorAll('.chip').forEach(function(c){
+    c.classList.remove('a-blue', 'a-red', 'a-green', 'a-yellow');
+  });
+
+  // Clear LDAP (except if auto-filled by system logic)
+  if(!window.myLdap){
+    clearLdap();
+  }
+
+  // Checkboxes
+  var decl = document.getElementById('declChk');
+  if(decl) { decl.checked = false; toggleSub(); }
+
+  // Visibility blocks
+  document.getElementById('bdayNote').classList.remove('on');
+  document.getElementById('bdayDateBadge').textContent = 'optional';
+  document.getElementById('bdayDateBadge').className = 'opt';
+  document.getElementById('proofBadge').textContent = 'optional';
+  document.getElementById('proofBadge').className = 'opt';
+  document.getElementById('wkndBlock').classList.remove('on');
+  document.getElementById('dateOk').classList.remove('on');
+  document.getElementById('peerBlock').classList.remove('on');
+
+  clearDraft();
+  showToast("Form cleared.", "info");
 }
 
 function checkWknd(){
