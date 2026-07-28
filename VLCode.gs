@@ -267,37 +267,41 @@ function getCalendarData() {
     // Re-read lastRow in case UUID backfill changed row count
     lastRow = sheet.getLastRow();
     var data        = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
-    var displayData = sheet.getRange(2, 1, lastRow - 1, lastCol).getDisplayValues();
     var tz          = Session.getScriptTimeZone();
     var events      = [];
 
+    // Pre-resolve column indices for better performance
+    var cTs        = colMap["timestamp"];
+    var cEmail     = colMap["emailaddress"];
+    var cLdap      = colMap["ldap"];
+    var cChannel   = colMap["channel"];
+    var cVlDate    = colMap["vldate"];
+    var cTeamLead  = colMap["teamlead"];
+    var cReason    = colMap["reasonforvl"];
+    var cWorkGroup = colMap["workgroup"];
+    var cSite      = colMap["site"];
+    var cAccProof  = colMap["accrualssnipit"];
+    var cAccruals  = colMap["accruals"];
+    var cMonth     = colMap["month"];
+    var cStatus    = colMap["status"];
+    var cComments  = colMap["comments"];
+    var cRemarks   = colMap["remarks"]; // fallback for comments
+    var cAttendance= colMap["attendance"];
+    var cConf      = colMap["confirmationonstatus"];
+    var cEmailSent = colMap["emailsent"];
+    var cProof     = colMap["proofartifacts"];
+    var cUuid      = colMap["rowuuid"];
+
     for (var i = 0; i < data.length; i++) {
-      // ── FIX: capture row-specific references, not closure over loop var ──
-      var row        = data[i];
-      var displayRow = displayData[i];
+      var row = data[i];
 
-      // ── FIX: inline column lookup to avoid stale closure bug ──
-      var getVal  = (function(r, cm) {
-        return function(colName) {
-          var idx = cm[colName.replace(/[^a-zA-Z0-9]/g,'').toLowerCase()];
-          return (idx !== undefined && r[idx] != null) ? r[idx] : "";
-        };
-      })(row, colMap);
-
-      var getDisp = (function(dr, cm) {
-        return function(colName) {
-          var idx = cm[colName.replace(/[^a-zA-Z0-9]/g,'').toLowerCase()];
-          return (idx !== undefined && dr[idx] != null) ? dr[idx] : "";
-        };
-      })(displayRow, colMap);
-
-      var rawTs  = getVal("Timestamp");
-      var rawLdap = getVal("LDAP").toString().trim();
+      var rawTs   = cTs !== undefined && row[cTs] != null ? row[cTs] : "";
+      var rawLdap = cLdap !== undefined && row[cLdap] != null ? row[cLdap].toString().trim() : "";
       if (!rawTs || !rawLdap) continue;
 
       // Format VL date
       var formattedDate = "";
-      var rawDate = getVal("VL Date");
+      var rawDate = cVlDate !== undefined && row[cVlDate] != null ? row[cVlDate] : "";
       if (Object.prototype.toString.call(rawDate) === '[object Date]' && !isNaN(rawDate.getTime())) {
         formattedDate = Utilities.formatDate(rawDate, tz, "yyyy-MM-dd");
       } else if (rawDate) {
@@ -333,31 +337,44 @@ function getCalendarData() {
       }
 
       // Use stable UUID as event ID
-      var uuid = getVal("Row UUID").toString().trim();
+      var uuid = cUuid !== undefined && row[cUuid] != null ? row[cUuid].toString().trim() : "";
       if (!uuid) uuid = "ev_" + i; // fallback for rows not yet indexed
+
+      // Manually format attendance and accruals
+      var rawAccruals = cAccruals !== undefined && row[cAccruals] != null ? row[cAccruals] : "";
+      var accrualsStr = rawAccruals.toString().trim();
+
+      var rawAttendance = cAttendance !== undefined && row[cAttendance] != null ? row[cAttendance] : "";
+      var attendanceStr = rawAttendance.toString().trim();
+      if (typeof rawAttendance === 'number') {
+        attendanceStr = (rawAttendance * 100).toFixed(2) + "%";
+      }
+
+      var comments = cComments !== undefined && row[cComments] != null ? row[cComments].toString().trim() : "";
+      var remarks  = cRemarks !== undefined && row[cRemarks] != null ? row[cRemarks].toString().trim() : "";
 
       events.push({
         id           : uuid,
         rowNum       : i + 2,
         timestamp    : tsStr,
         tsEpoch      : tsEpoch,
-        email        : getVal("Email Address").toString().trim().toLowerCase(),
-        ldap         : getVal("LDAP").toString().trim(),
-        channel      : getVal("Channel").toString().trim(),
+        email        : cEmail !== undefined && row[cEmail] != null ? row[cEmail].toString().trim().toLowerCase() : "",
+        ldap         : rawLdap,
+        channel      : cChannel !== undefined && row[cChannel] != null ? row[cChannel].toString().trim() : "",
         date         : formattedDate,
-        teamLead     : getVal("Team Lead").toString().trim(),
-        reason       : getVal("Reason for VL").toString().trim(),
-        workGroup    : getVal("Work Group").toString().trim(),
-        site         : getVal("Site").toString().trim(),
-        accruals     : getDisp("Accruals").toString().trim(),
-        accrualsProof: getVal("Accruals Snip-it").toString().trim(),
-        month        : getVal("Month").toString().trim(),
-        status       : getVal("Status").toString().trim() || "Pending",
-        remarks      : getVal("Comments").toString().trim() || getVal("Remarks").toString().trim(),
-        attendance   : getDisp("Attendance").toString().trim(),
-        confirmation : getVal("Confirmation on Status").toString().trim(),
-        emailSent    : getVal("Email Sent").toString().trim(),
-        proof        : getVal("Proof / Artifacts").toString().trim()
+        teamLead     : cTeamLead !== undefined && row[cTeamLead] != null ? row[cTeamLead].toString().trim() : "",
+        reason       : cReason !== undefined && row[cReason] != null ? row[cReason].toString().trim() : "",
+        workGroup    : cWorkGroup !== undefined && row[cWorkGroup] != null ? row[cWorkGroup].toString().trim() : "",
+        site         : cSite !== undefined && row[cSite] != null ? row[cSite].toString().trim() : "",
+        accruals     : accrualsStr,
+        accrualsProof: cAccProof !== undefined && row[cAccProof] != null ? row[cAccProof].toString().trim() : "",
+        month        : cMonth !== undefined && row[cMonth] != null ? row[cMonth].toString().trim() : "",
+        status       : cStatus !== undefined && row[cStatus] != null && row[cStatus].toString().trim() ? row[cStatus].toString().trim() : "Pending",
+        remarks      : comments || remarks,
+        attendance   : attendanceStr,
+        confirmation : cConf !== undefined && row[cConf] != null ? row[cConf].toString().trim() : "",
+        emailSent    : cEmailSent !== undefined && row[cEmailSent] != null ? row[cEmailSent].toString().trim() : "",
+        proof        : cProof !== undefined && row[cProof] != null ? row[cProof].toString().trim() : ""
       });
     }
 
@@ -550,6 +567,11 @@ function processVLForm(data) {
       return { status:"error", message:"Duplicate Request Blocked." };
     }
 
+    if (data.reasonForVL === "Birthday" && checkBirthdayLeaveYearlyDuplicate(sheet, data.ldap.trim(), data.vlDate)) {
+      _log("WARN", "processVLForm", "Yearly birthday duplicate blocked", { ldap: data.ldap, date: data.vlDate });
+      return { status:"error", message:"You already have an approved Birthday Leave for this calendar year." };
+    }
+
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     var colMap  = {};
     headers.forEach(function(h, idx) {
@@ -658,6 +680,61 @@ function getDashboardPayload() {
   }
 
   return payload;
+}
+
+// ── BIRTHDAY LEAVE YEARLY CHECK ───────────────────────
+function checkBirthdayLeaveYearlyDuplicate(sheet, ldap, vlDate) {
+  try {
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+    if (lastRow < 2) return false;
+
+    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    var colMap  = {};
+    headers.forEach(function(h, idx) {
+      colMap[h.toString().replace(/[^a-zA-Z0-9]/g,'').toLowerCase()] = idx;
+    });
+    if (colMap["ldap"] === undefined || colMap["vldate"] === undefined || colMap["reasonforvl"] === undefined || colMap["status"] === undefined) return false;
+
+    var data = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+    var tz   = Session.getScriptTimeZone();
+
+    var reqYear = null;
+    var parsedReq = new Date(vlDate + "T00:00:00");
+    if (!isNaN(parsedReq.getTime())) {
+      reqYear = parsedReq.getFullYear();
+    } else {
+      reqYear = new Date(vlDate).getFullYear();
+    }
+
+    for (var i = 0; i < data.length; i++) {
+      var sheetLdap = (data[i][colMap["ldap"]]||"").toString().trim().toLowerCase();
+      var reason    = (data[i][colMap["reasonforvl"]]||"").toString().trim().toLowerCase();
+      var status    = (data[i][colMap["status"]]||"").toString().trim().toLowerCase();
+      var rawDate   = data[i][colMap["vldate"]];
+
+      if (!sheetLdap || !rawDate) continue;
+
+      if (sheetLdap === ldap.toLowerCase() && reason.includes("birthday")) {
+        if (status.includes("approved") || status.includes("birthday")) {
+          var sheetYear = null;
+          if (Object.prototype.toString.call(rawDate) === '[object Date]' && !isNaN(rawDate.getTime())) {
+            sheetYear = parseInt(Utilities.formatDate(rawDate, tz, "yyyy"), 10);
+          } else {
+            var rdStr2 = rawDate.toString().trim();
+            if (/^\d{4}-\d{2}-\d{2}/.test(rdStr2)) {
+              sheetYear = parseInt(rdStr2.substring(0, 4), 10);
+            } else {
+              var p = new Date(rdStr2 + "T00:00:00");
+              sheetYear = !isNaN(p.getTime()) ? parseInt(Utilities.formatDate(p, tz, "yyyy"), 10) : new Date(rdStr2).getFullYear();
+            }
+          }
+          if (sheetYear === reqYear) return true;
+        }
+      }
+    }
+    return false;
+  } catch(e) { return false; }
 }
 
 // ── DUPLICATE CHECK ───────────────────────────────────
@@ -794,9 +871,22 @@ function sendNazunaNotifications() {
     var colMap = {};
     headers.forEach(function(h, idx) { colMap[h.toString().replace(/[^a-zA-Z0-9]/g,'').toLowerCase()] = idx; });
     var data = sheet.getRange(2, 1, lastRow - 1, headers.length).getValues();
-    var displayData = sheet.getRange(2, 1, lastRow - 1, headers.length).getDisplayValues();
     var tz = Session.getScriptTimeZone();
     var sentCount = 0;
+
+    // Resolve columns ahead of loop
+    var cEmail    = colMap["emailaddress"];
+    var cLdap     = colMap["ldap"];
+    var cVlDate   = colMap["vldate"];
+    var cTeamLead = colMap["teamlead"];
+    var cReason   = colMap["reasonforvl"];
+    var cWorkGrp  = colMap["workgroup"];
+    var cComments = colMap["comments"];
+    var cTs       = colMap["timestamp"];
+    var cAccruals = colMap["accruals"];
+    var cAttend   = colMap["attendance"];
+    var cSite     = colMap["site"];
+
     for (var i = 0; i < data.length; i++) {
       var row    = data[i];
       var status = (row[statusColIdx] || "").toString().trim();
@@ -804,12 +894,12 @@ function sendNazunaNotifications() {
       var sent   = (row[sentColIdx]   || "").toString().trim();
       var lStat  = status.toLowerCase();
       if (!status || lStat.includes("pending") || !conf || sent) continue;
-      var getVal  = (function(r, cm) { return function(n) { var x = cm[n.replace(/[^a-zA-Z0-9]/g,'').toLowerCase()]; return x !== undefined ? r[x] : ""; }; })(row, colMap);
-      var getDisp = (function(dr, cm) { return function(n) { var x = cm[n.replace(/[^a-zA-Z0-9]/g,'').toLowerCase()]; return x !== undefined ? dr[x] : ""; }; })(displayData[i], colMap);
-      var emailAddress = getVal("Email Address");
+
+      var emailAddress = cEmail !== undefined && row[cEmail] != null ? row[cEmail].toString().trim() : "";
       if (!emailAddress) continue;
-      var ldap = getVal("LDAP");
-      var vlDateRaw = getVal("VL Date");
+
+      var ldap = cLdap !== undefined && row[cLdap] != null ? row[cLdap].toString().trim() : "";
+      var vlDateRaw = cVlDate !== undefined && row[cVlDate] != null ? row[cVlDate] : "";
       var formattedDate = Object.prototype.toString.call(vlDateRaw) === '[object Date]'
         ? Utilities.formatDate(vlDateRaw, tz, "MMMM dd, yyyy") : vlDateRaw.toString();
       var emoji = "⚠️";
@@ -817,11 +907,24 @@ function sendNazunaNotifications() {
       else if (lStat.includes("approved")) emoji = "✅";
       else if (lStat.includes("denied"))   emoji = "⛔";
       else if (lStat.includes("no alloc")) emoji = "🚫";
+
+      var teamLead = cTeamLead !== undefined && row[cTeamLead] != null ? row[cTeamLead].toString().trim() : "";
+      var reason   = cReason !== undefined && row[cReason] != null ? row[cReason].toString().trim() : "";
+      var workGrp  = cWorkGrp !== undefined && row[cWorkGrp] != null ? row[cWorkGrp].toString().trim() : "";
+      var comments = cComments !== undefined && row[cComments] != null ? row[cComments].toString().trim() : "";
+      var ts       = cTs !== undefined && row[cTs] != null ? row[cTs].toString().trim() : "";
+      var site     = cSite !== undefined && row[cSite] != null ? row[cSite].toString().trim() : "";
+
+      var accruals = cAccruals !== undefined && row[cAccruals] != null ? row[cAccruals].toString().trim() : "";
+      var rawAttend= cAttend !== undefined && row[cAttend] != null ? row[cAttend] : "";
+      var attend   = rawAttend.toString().trim();
+      if (typeof rawAttend === 'number') {
+        attend = (rawAttend * 100).toFixed(2) + "%";
+      }
+
       var htmlBody = createEmailTemplate(ldap, formattedDate, status, "-",
-        getVal("Team Lead"), getVal("Reason for VL"), getVal("Work Group"),
-        getVal("Comments"), getVal("Timestamp"), emoji,
-        getDisp("Accruals"), getDisp("Attendance"), getVal("Site"),
-        getVal("Confirmation on Status"));
+        teamLead, reason, workGrp, comments, ts, emoji, accruals, attend, site, conf);
+
       try {
         MailApp.sendEmail({ to: emailAddress, subject: emoji + " Google Play VL Calendar Update - " + status, htmlBody: htmlBody, name: "Google Play VL Calendar" });
         var stamp = Utilities.formatDate(new Date(), tz, "MM/dd/yy HH:mm") + " by " + actor.split('@')[0];
@@ -1015,7 +1118,6 @@ function getMWLData() {
     if (lastRow < 2) return { events: [] };
 
     var data    = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
-    var dispData= sheet.getRange(2, 1, lastRow - 1, lastCol).getDisplayValues();
     var tz      = Session.getScriptTimeZone();
 
     // ── Dedup: key = LDAP|LeaveDate|Type, keep latest timestamp ──
@@ -1023,7 +1125,6 @@ function getMWLData() {
 
     for (var i = 0; i < data.length; i++) {
       var row  = data[i];
-      var disp = dispData[i];
 
       var ldap      = (row[MWL_COL.LDAP]      || "").toString().trim();
       var typeOfLv  = (row[MWL_COL.TYPE]       || "").toString().trim();
