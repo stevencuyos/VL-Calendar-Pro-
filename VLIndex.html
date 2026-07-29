@@ -2942,9 +2942,11 @@ function closeOverflowPopover(){
 
 /* QoL #14: Popover with intelligent caret side and delay */
 function showEventDetails(ev,targetId){
+  if(isAnyModalOpen())return;
   clearTimeout(poTimer);
   var target = ev.currentTarget;
   poTimer = setTimeout(function(){
+    if(isAnyModalOpen())return;
     var e=serverEvents.find(function(evnt){return evnt.id.toString()===targetId.toString()});
     if(!e)return;
     var po=document.getElementById('eventPopover');
@@ -3508,11 +3510,19 @@ var _syncRetryCount=0;
 var _syncRetryTimer=null;
 var _SYNC_MAX_RETRIES=4;
 
+function isAnyModalOpen(){
+  var modals=['viewOv','adminOv','cnfOv','sendSummaryOv','formModal'];
+  for(var i=0;i<modals.length;i++){
+    var el=document.getElementById(modals[i]);
+    if(el&&el.classList.contains('on'))return true;
+  }
+  return false;
+}
+
 function _doLiveSync(){
   if(_syncInFlight)return;
   if(!window.google||!google.script)return;
-  var modals=['viewOv','adminOv','cnfOv','sendSummaryOv','formModal'];
-  for(var i=0;i<modals.length;i++){if(document.getElementById(modals[i]).classList.contains('on'))return}
+  if(isAnyModalOpen())return;
   _syncInFlight=true;setSyncState('syncing');
   google.script.run
     .withSuccessHandler(function(payload){
